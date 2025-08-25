@@ -1,0 +1,33 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  font-family: "DM Sans", sans-serif;
+}
+
+.card {
+  width: 15rem;
+  height: 20rem;
+  border-radius: 2rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); 
+}
+
+.produtos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.comprar{
+  width: screen;
+  height: screen;
+}
+
+.comprarCard{
+
+}
