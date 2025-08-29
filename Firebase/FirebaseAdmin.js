@@ -1,17 +1,8 @@
-// firebaseAdmin.js
 import admin from "firebase-admin";
-import { createRequire } from "module";
+import serviceAccount from "./serviceAccountKey.json" assert { type: "json" };
 
-const require = createRequire(import.meta.url);
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
-// carrega a chave de serviço do Firebase
-const serviceAccount = require("./serviceAccountKey.json");
-
-// inicializa o Firebase Admin
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-}
-
-export default admin;
+export const db = admin.firestore();

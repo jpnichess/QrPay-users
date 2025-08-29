@@ -9,7 +9,7 @@ function ComprarPage() {
   // Produto que será mostrado na tela
   const product = {
     title: "Salchipão SENAI",
-    price: 0.01,
+    price: 4,
     foto: "salchipao.png", // coloque a imagem na pasta public ou use URL
   };
 
