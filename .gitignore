@@ -1,6 +1,7 @@
 # Backend sensitive
 BackEnd/.env
 Firebase/serviceAccountKey.json
+/Admin
 
 # Node modules
 node_modules
