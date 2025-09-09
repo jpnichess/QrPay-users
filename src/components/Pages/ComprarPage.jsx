@@ -9,7 +9,7 @@ function ComprarPage() {
   const [expiresAt, setExpiresAt] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [ticketId, setTicketId] = useState(null);
-  
+
   const location = useLocation();
   const product = location.state?.product;
   const user = location.state?.user;
@@ -30,7 +30,7 @@ function ComprarPage() {
         return;
       }
 
-      const response = await fetch("http://localhost:5000/pagar", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/pagar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -65,11 +65,14 @@ function ComprarPage() {
     if (!ticketId) return alert("Gere o pagamento antes de simular.");
 
     try {
-      const response = await fetch("http://localhost:5000/simular-pagamento", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ docId: ticketId }),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/simular-pagamento`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ docId: ticketId }),
+        }
+      );
       const data = await response.json();
 
       if (data.ok) {
