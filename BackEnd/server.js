@@ -1,17 +1,20 @@
-// server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import admin from "firebase-admin";
 import QRCode from "qrcode";
-import serviceAccount from "../Firebase/ServiceAccountKey.json" with { type: "json" };
 
 dotenv.config();
 
-// Inicializa Firebase
+// Inicializa Firebase usando variáveis de ambiente
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.cert({
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+  }),
 });
+
 const db = admin.firestore();
 db.settings({ ignoreUndefinedProperties: true });
 
@@ -19,6 +22,8 @@ db.settings({ ignoreUndefinedProperties: true });
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+// ... resto do código igual
 
 // --------------------
 // Função: pagamento simulado
@@ -53,7 +58,11 @@ app.post("/pagar", async (req, res) => {
       return res.status(400).json({ error: "Campos obrigatórios faltando" });
     }
 
-    const pagamento = await gerarPagamentoSimulado(product, { email, uid, displayName });
+    const pagamento = await gerarPagamentoSimulado(product, {
+      email,
+      uid,
+      displayName,
+    });
 
     const docRef = await db.collection("compras").add({
       uid,
@@ -87,14 +96,18 @@ app.post("/simular-pagamento", async (req, res) => {
     const { docId } = req.body;
 
     if (!docId) {
-      return res.status(400).json({ ok: false, error: "ID do ticket é obrigatório" });
+      return res
+        .status(400)
+        .json({ ok: false, error: "ID do ticket é obrigatório" });
     }
 
     const docRef = db.collection("compras").doc(docId);
     const docSnap = await docRef.get();
 
     if (!docSnap.exists) {
-      return res.status(404).json({ ok: false, error: "Ticket não encontrado" });
+      return res
+        .status(404)
+        .json({ ok: false, error: "Ticket não encontrado" });
     }
 
     // Gerar QR code de retirada
