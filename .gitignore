@@ -6,6 +6,7 @@ Firebase/serviceAccountKey.json
 # Node modules
 node_modules
 dist
+.env
 
 # Logs
 logs

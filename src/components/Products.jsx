@@ -2,11 +2,23 @@ import { useNavigate } from "react-router-dom";
 
 const productsList = [
   {
-    title: "Salchipão",
-    description: "Salchipão senai",
-    price: 4.0,
-    foto: "salchipao.png",
+    title: "Lasanha",
+    description: "Lasanha Bolonhesa",
+    price: 12.00,
+    foto: "lasanha.jpg",
   },
+  {
+    title: "Fatia de Pizza",
+    description: "Pizza de Pepperoni",
+    price: 10.00,
+    foto: "pizza.jpg",
+  },
+  {
+    title: "Xis tudo",
+    description: "Xis tudo grande",
+    price: 25.00,
+    foto: "xis.jpg",
+  }
 ];
 
 function CardProduto({ product, onBuy }) {
@@ -55,7 +67,7 @@ function Products({ user }) {
   return (
     <section className="produtos">
       {productsList.map((product, index) => (
-        <CardProduto
+        <CardProduto 
           key={index}
           product={product}
           onBuy={() => handleBuy(product, user)} 

@@ -1,21 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getAuth } from "firebase/auth";
+import { useLocation } from "react-router-dom";
 
 function ComprarPage() {
   const [qrCode, setQrCode] = useState(null);
   const [qrCodeImg, setQrCodeImg] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [expiresAt, setExpiresAt] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [ticketId, setTicketId] = useState(null);
+  
+  const location = useLocation();
+  const product = location.state?.product;
+  const user = location.state?.user;
 
-  // Produto que será mostrado na tela
-  const product = {
-    title: "Salchipão SENAI",
-    price: 4,
-    foto: "salchipao.png", // coloque a imagem na pasta public ou use URL
-  };
+  if (!product || !user) {
+    return <p>Produto ou usuário não encontrados.</p>;
+  }
 
   async function handlePagar() {
     setLoading(true);
-
     try {
       const auth = getAuth();
       const user = auth.currentUser;
@@ -38,8 +42,17 @@ function ComprarPage() {
       });
 
       const data = await response.json();
+
+      let qrBase64 = data.qr_code_base64;
+      if (!qrBase64 && data.qr_code) {
+        const QRCodeLib = await import("qrcode");
+        qrBase64 = await QRCodeLib.toDataURL(data.qr_code);
+      }
+
       setQrCode(data.qr_code);
-      setQrCodeImg(data.qr_code_base64);
+      setQrCodeImg(qrBase64);
+      setExpiresAt(new Date(data.expiresAt));
+      setTicketId(data.ticketId); // <-- armazena o ticketId aqui
     } catch (error) {
       console.error("Erro ao pagar:", error);
       alert("Erro ao gerar pagamento. Tente novamente.");
@@ -48,12 +61,51 @@ function ComprarPage() {
     }
   }
 
+  const handleSimularPagamento = async () => {
+    if (!ticketId) return alert("Gere o pagamento antes de simular.");
+
+    try {
+      const response = await fetch("http://localhost:5000/simular-pagamento", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ docId: ticketId }),
+      });
+      const data = await response.json();
+
+      if (data.ok) {
+        alert("Pagamento simulado com sucesso! Ticket liberado para retirada.");
+      } else {
+        alert("Erro: " + data.error);
+      }
+    } catch (err) {
+      console.error("Erro ao simular pagamento:", err);
+      alert("Falha ao simular pagamento.");
+    }
+  };
+
+  useEffect(() => {
+    if (!expiresAt) return;
+
+    const interval = setInterval(() => {
+      const diff = Math.max(0, Math.floor((expiresAt - new Date()) / 1000));
+      setTimeLeft(diff);
+
+      if (diff === 0) {
+        setQrCode(null);
+        setQrCodeImg(null);
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
   const copy = async (qrCode) => {
     try {
       await navigator.clipboard.writeText(qrCode);
-      console.log("Código copiado com sucesso!");
-    } catch (error) {
-      console.error("Falha ao copiar o Código:", error);
+      alert("Código copiado com sucesso!");
+    } catch {
+      alert("Não foi possível copiar o código.");
     }
   };
 
@@ -85,18 +137,25 @@ function ComprarPage() {
         {qrCodeImg && (
           <div className="mt-6 p-4 bg-white rounded-lg shadow-md flex flex-col items-center">
             <h2 className="text-lg font-semibold mb-2">Escaneie o QR Code</h2>
-            <img
-              src={`data:image/png;base64,${qrCodeImg}`}
-              alt="QR Code Pix"
-              className="w-64 h-64 mb-4"
-            />
+            <img src={qrCodeImg} alt="QR Code Pix" className="w-64 h-64 mb-4" />
+            <p className="mb-2 text-red-600 font-medium">
+              Expira em: {Math.floor(timeLeft / 60)}:
+              {String(timeLeft % 60).padStart(2, "0")} min
+            </p>
 
             <h3 className="font-medium mb-2">Ou copie e cole:</h3>
             <button
               onClick={() => copy(qrCode)}
-              className="bg-green-600 w-32 rounded hover:bg-green-700 text-white font-medium transition-colors mb-10"
+              className="bg-green-600 w-32 rounded hover:bg-green-700 text-white font-medium transition-colors mb-4"
             >
               Copiar Código
+            </button>
+
+            <button
+              onClick={handleSimularPagamento}
+              className="mt-2 w-full bg-green-600 text-white p-2 rounded hover:bg-green-700"
+            >
+              Simular pagamento como aprovado
             </button>
           </div>
         )}

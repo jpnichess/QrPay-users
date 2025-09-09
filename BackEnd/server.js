@@ -1,10 +1,10 @@
+// server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import admin from "firebase-admin";
-import { MercadoPagoConfig, Payment } from "mercadopago";
-import serviceAccount from "../Firebase/serviceAccountKey.json" assert { type: "json" };
 import QRCode from "qrcode";
+import serviceAccount from "../Firebase/ServiceAccountKey.json" with { type: "json" };
 
 dotenv.config();
 
@@ -13,106 +13,111 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 const db = admin.firestore();
+db.settings({ ignoreUndefinedProperties: true });
 
-// Inicializa Mercado Pago
-const client = new MercadoPagoConfig({
-  accessToken: process.env.ACCESS_TOKEN,
-  options: { timeout: 5000, idempotencyKey: "abc" },
-});
-const payment = new Payment(client);
-
-// Configura servidor Express
+// Inicializa Express
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: "http://localhost:5175" }));
+app.use(cors());
 
 // --------------------
-// Endpoint: criar pagamento PIX
+// Função: pagamento simulado
+// --------------------
+async function gerarPagamentoSimulado(product, user) {
+  const id = Math.floor(Math.random() * 1000000);
+  const EXPIRATION_MINUTES = 15;
+  const expirationDate = new Date(Date.now() + EXPIRATION_MINUTES * 60 * 1000);
+
+  const qrCodeValue = `compra:${id}-${Date.now()}`;
+  const qrCodeBase64 = await QRCode.toDataURL(qrCodeValue);
+
+  return {
+    id,
+    product,
+    user,
+    status: false,
+    qr_code: qrCodeValue,
+    qr_code_base64: qrCodeBase64,
+    expiresAt: expirationDate,
+  };
+}
+
+// --------------------
+// Endpoint: criar pedido/pagamento
 // --------------------
 app.post("/pagar", async (req, res) => {
   try {
     const { product, email, uid, displayName } = req.body;
 
-    // Corpo do pagamento
-    const body = {
-      transaction_amount: product.price,
-      description: product.title,
-      payment_method_id: "pix",
-      payer: { email },
-    };
+    if (!product || !product.price || !product.title || !email || !uid) {
+      return res.status(400).json({ error: "Campos obrigatórios faltando" });
+    }
 
-    const mpResponse = await payment.create({ body });
+    const pagamento = await gerarPagamentoSimulado(product, { email, uid, displayName });
 
-    // Gerar QR code para retirada
-    const qrValueRetirada = `retirada:${mpResponse.id}-${Date.now()}`;
-    const qrCodeBase64Retirada = await QRCode.toDataURL(qrValueRetirada);
-
-    // Salvar no Firestore
     const docRef = await db.collection("compras").add({
       uid,
       email,
       displayName: displayName || "Sem Nome",
       product,
-      status: false, // ainda não pago
-      mp_id: mpResponse.id,
-      qr_code: mpResponse.point_of_interaction.transaction_data.qr_code,
-      qr_code_base64: mpResponse.point_of_interaction.transaction_data.qr_code_base64,
-      qr_code_retirada: qrValueRetirada,
-      qr_code_retirada_base64: qrCodeBase64Retirada,
-      ticket_url: mpResponse.point_of_interaction.transaction_data.ticket_url,
+      status: false,
+      qr_code: pagamento.qr_code,
+      qr_code_base64: pagamento.qr_code_base64,
+      qr_code_retirada: null,
+      qr_code_retirada_base64: null,
+      retirada_valida: false,
       createdAt: new Date(),
+      qr_code_expiration: pagamento.expiresAt,
+      retirado: false,
     });
-
-    console.log("Compra registrada com ID:", docRef.id);
 
     res.json({
-      id: mpResponse.id,
-      qr_code: mpResponse.point_of_interaction.transaction_data.qr_code,
-      qr_code_base64: mpResponse.point_of_interaction.transaction_data.qr_code_base64,
-      qr_code_retirada_base64: qrCodeBase64Retirada,
-      ticket_url: mpResponse.point_of_interaction.transaction_data.ticket_url,
+      ticketId: docRef.id,
+      qr_code: pagamento.qr_code,
+      qr_code_base64: pagamento.qr_code_base64,
+      expiresAt: pagamento.expiresAt,
     });
   } catch (err) {
-    console.error("Erro ao gerar pagamento:", err);
-    res.status(500).json({ error: "Erro ao gerar pagamento" });
+    console.error("Erro ao gerar pagamento simulado:", err);
+    res.status(500).json({ error: "Erro ao gerar pagamento simulado" });
   }
 });
-
-// --------------------
-// Webhook: atualizar status de pagamento
-// --------------------
-app.post("/webhook", async (req, res) => {
+app.post("/simular-pagamento", async (req, res) => {
   try {
-    const { id, topic } = req.body;
+    const { docId } = req.body;
 
-    if (topic !== "payment") return res.status(400).send("Evento ignorado");
-
-    const querySnapshot = await db
-      .collection("compras")
-      .where("mp_id", "==", id)
-      .get();
-
-    if (!querySnapshot.empty) {
-      const docId = querySnapshot.docs[0].id;
-
-      // Gerar QR code de retirada atualizado (opcional)
-      const qrValueRetirada = `retirada:${docId}-${Date.now()}`;
-      const qrCodeBase64Retirada = await QRCode.toDataURL(qrValueRetirada);
-
-      await db.collection("compras").doc(docId).update({
-        status: true,
-        updatedAt: new Date(),
-        qr_code_retirada: qrValueRetirada,
-        qr_code_retirada_base64: qrCodeBase64Retirada,
-      });
-
-      console.log("Pagamento confirmado! QR code de retirada atualizado.");
+    if (!docId) {
+      return res.status(400).json({ ok: false, error: "ID do ticket é obrigatório" });
     }
 
-    res.status(200).send("OK");
+    const docRef = db.collection("compras").doc(docId);
+    const docSnap = await docRef.get();
+
+    if (!docSnap.exists) {
+      return res.status(404).json({ ok: false, error: "Ticket não encontrado" });
+    }
+
+    // Gerar QR code de retirada
+    const qrValueRetirada = `retirada:${docId}-${Date.now()}`;
+    const QRCodeLib = await import("qrcode");
+    const qrCodeBase64Retirada = await QRCodeLib.toDataURL(qrValueRetirada);
+
+    await docRef.update({
+      status: true,
+      retirada_valida: true,
+      qr_code_retirada: qrValueRetirada,
+      qr_code_retirada_base64: qrCodeBase64Retirada,
+      updatedAt: new Date(),
+    });
+
+    res.json({
+      ok: true,
+      qr_code_retirada: qrValueRetirada,
+      qr_code_retirada_base64: qrCodeBase64Retirada,
+    });
   } catch (err) {
-    console.error("Erro no webhook:", err);
-    res.status(500).json({ error: "Erro no webhook" });
+    console.error("Erro ao simular pagamento:", err);
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 

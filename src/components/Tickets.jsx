@@ -9,7 +9,6 @@ function Tickets({ user }) {
       return;
     }
 
-    // Passa apenas uid e dados simples
     navigate("/tickets", { state: { uid: user.uid } });
   };
 

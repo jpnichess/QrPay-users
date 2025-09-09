@@ -11,9 +11,10 @@
 
 .card {
   width: 15rem;
-  height: 20rem;
+  height: 15rem;
   border-radius: 2rem;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); 
+  margin-bottom: 0.75rem;
 }
 
 .produtos {

@@ -15,14 +15,14 @@ function App() {
   }, []);
 
   return (
-    <main className="w-screen h-screen bg-slate-200">
-      <header className="w-screen h-24 items-center flex flex-row justify-center">
+    <main className="max-w-screen min-h-screen bg-slate-200">
+      <header className=" h-24 items-center flex flex-row justify-center">
         <div className="w-[15rem] flex flex-row justify-between">
           {<Tickets user={user} />}
           {user ? <Logout user={user} /> : <Login />}
         </div>
       </header>
-      <section>{<Products user={user} />}</section>
+      <section >{<Products user={user} />}</section>
     </main>
   );
 }
